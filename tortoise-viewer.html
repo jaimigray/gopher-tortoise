@@ -197,7 +197,7 @@ input[type=range]::-webkit-slider-thumb{
         id="mv"
         src="gopher-tortoise.glb"
         draco-decoder-path="https://www.gstatic.com/draco/versioned/decoders/1.5.6/"
-        camera-orbit="150deg 65deg auto"
+        camera-orbit="130deg 65deg auto"
         camera-controls
         exposure="0.6"
         shadow-intensity="1"
@@ -357,11 +357,25 @@ function findShell() {
 }
 
 function initShell(obj) {
-  // Pre-enable transparency so opacity slider works immediately
+  const scene = getThreeScene();
+  let shell002Color = null;
+  if (scene) {
+    scene.traverse(o => {
+      if (!shell002Color && o.name && o.name.toLowerCase() === 'shell002') {
+        const m = Array.isArray(o.material) ? o.material[0] : o.material;
+        if (m && m.color) shell002Color = m.color.clone();
+      }
+    });
+  }
   obj.traverse(child => {
     if (!child.isMesh) return;
     const mats = Array.isArray(child.material) ? child.material : [child.material];
-    mats.forEach(m => { m.transparent = true; m.needsUpdate = true; });
+    mats.forEach(m => {
+      m.transparent = true;
+      if (shell002Color) m.color.copy(shell002Color);
+      m.roughness = Math.min(1, (m.roughness || 0.5) + 0.4);
+      m.needsUpdate = true;
+    });
   });
   nudgeRender();
 }
