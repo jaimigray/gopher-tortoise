@@ -259,10 +259,17 @@ input[type=range]::-webkit-slider-thumb{
           </div>
         </div>
 
-        <div class="p-section" id="mat-section">
-          <div class="p-label">Elements</div>
-          <div class="loading-msg" id="mat-loading">Loading model…</div>
-          <div id="mat-list"></div>
+        <div class="p-section">
+          <div class="p-label">Shell</div>
+          <div class="tog-row">
+            <span class="tog-label">Visible</span>
+            <label class="tog"><input type="checkbox" id="t-shell-vis" checked><span class="tog-t"></span></label>
+          </div>
+          <div class="ctrl">
+            <span class="ctrl-l">Opacity</span>
+            <input type="range" id="s-shell-op" min="0" max="1" step="0.01" value="1">
+            <span class="ctrl-v" id="v-shell-op">1</span>
+          </div>
         </div>
 
         <div class="p-section">
@@ -281,13 +288,6 @@ input[type=range]::-webkit-slider-thumb{
 </div>
 
 <script>
-const PALETTE = [
-  '#c4a96e','#8b7355','#d4b896','#a0856a','#e8d4b0',
-  '#7a6245','#b89870','#6b7c5a','#d4c4a0','#9aab8a',
-];
-
-const MESH_COLORS = {};
-
 const mv = document.getElementById('mv');
 
 function sizeMV() {
@@ -344,126 +344,36 @@ function nudgeRender() {
   requestAnimationFrame(() => { mv.exposure = e; });
 }
 
-function applyAssignedColors() {
+let shellObj = null;
+
+mv.addEventListener('load', () => {
   const scene = getThreeScene();
   if (!scene) return;
-  scene.traverse(obj => {
-    if (!obj.isMesh) return;
-    const hex = MESH_COLORS[obj.name];
-    if (!hex) return;
-    const m = Array.isArray(obj.material) ? obj.material[0] : obj.material;
-    if (!m || !m.color) return;
-    m.color.set(hex);
-    m.needsUpdate = true;
+  scene.traverse(obj => { if (obj.name === 'shell001') shellObj = obj; });
+});
+
+function applyShell(visible, opacity) {
+  if (!shellObj) return;
+  shellObj.visible = visible;
+  shellObj.traverse(child => {
+    if (!child.isMesh) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    mats.forEach(m => { m.transparent = opacity < 1; m.opacity = opacity; m.needsUpdate = true; });
   });
   nudgeRender();
 }
 
-mv.addEventListener('load', buildElementControls);
-const meshState = [];
+document.getElementById('t-shell-vis').addEventListener('change', function() {
+  const op = parseFloat(document.getElementById('s-shell-op').value);
+  applyShell(this.checked, op);
+});
 
-function prettifyName(s) {
-  return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-
-function buildElementControls() {
-  applyAssignedColors();
-  const list    = document.getElementById('mat-list');
-  const loading = document.getElementById('mat-loading');
-  loading.style.display = 'none';
-  list.innerHTML = '';
-  meshState.length = 0;
-
-  const scene = getThreeScene();
-  if (!scene) {
-    loading.style.display = '';
-    loading.textContent = 'Could not access scene graph.';
-    return;
-  }
-
-  const groups = [];
-  let contentGroup = null;
-  scene.traverse(obj => {
-    if (contentGroup) return;
-    if (obj === scene || obj.type !== 'Group' || !obj.name) return;
-    const namedChildren = obj.children.filter(c => c.name);
-    if (namedChildren.length >= 2) contentGroup = obj;
-  });
-
-  if (contentGroup) {
-    contentGroup.children.filter(c => c.name).forEach(child => {
-      groups.push({ name: child.name, objects: [child] });
-    });
-  } else {
-    const seen = new Set();
-    scene.traverse(obj => {
-      if (!obj.isMesh || !obj.name || seen.has(obj.name)) return;
-      seen.add(obj.name);
-      groups.push({ name: obj.name, objects: [obj] });
-    });
-  }
-
-  if (groups.length === 0) {
-    loading.style.display = '';
-    loading.textContent = 'No elements found in model.';
-    return;
-  }
-
-  groups.forEach((group, i) => {
-    const color = MESH_COLORS[group.name] || PALETTE[i % PALETTE.length];
-    meshState.push({ objects: group.objects, visible: true, opacity: 1 });
-
-    const slug = `el-${i}`;
-    const label = prettifyName(group.name);
-    const block = document.createElement('div');
-    block.className = 'mat-block';
-    block.innerHTML = `
-      <div class="mat-header">
-        <div class="mat-dot" style="background:${color};box-shadow:0 0 6px ${color}66;"></div>
-        <span class="mat-name" title="${label}">${label}</span>
-        <label class="tog">
-          <input type="checkbox" id="${slug}-vis" checked>
-          <span class="tog-t"></span>
-        </label>
-      </div>
-      <div class="ctrl">
-        <span class="ctrl-l" style="min-width:52px;">Opacity</span>
-        <input type="range" id="${slug}-op" min="0" max="1" step="0.01" value="1">
-        <span class="ctrl-v" id="${slug}-opv">1</span>
-      </div>
-    `;
-    list.appendChild(block);
-
-    block.querySelector(`#${slug}-op`).addEventListener('input', function() {
-      const v = parseFloat(this.value);
-      block.querySelector(`#${slug}-opv`).textContent = v.toFixed(2).replace(/\.?0+$/, '') || '0';
-      meshState[i].opacity = v;
-      applyElement(i);
-    });
-
-    block.querySelector(`#${slug}-vis`).addEventListener('change', function() {
-      meshState[i].visible = this.checked;
-      applyElement(i);
-    });
-  });
-}
-
-function applyElement(i) {
-  const { objects, visible, opacity } = meshState[i];
-  objects.forEach(obj => {
-    obj.visible = visible;
-    obj.traverse(child => {
-      if (!child.isMesh) return;
-      const mats = Array.isArray(child.material) ? child.material : [child.material];
-      mats.forEach(m => {
-        m.transparent = opacity < 1;
-        m.opacity = opacity;
-        m.needsUpdate = true;
-      });
-    });
-  });
-  nudgeRender();
-}
+document.getElementById('s-shell-op').addEventListener('input', function() {
+  const v = parseFloat(this.value);
+  document.getElementById('v-shell-op').textContent = v.toFixed(2).replace(/\.?0+$/, '') || '0';
+  const vis = document.getElementById('t-shell-vis').checked;
+  applyShell(vis, v);
+});
 
 document.getElementById('panel-collapse-btn').addEventListener('click', () => {
   const wrap = document.getElementById('panel-wrap');
