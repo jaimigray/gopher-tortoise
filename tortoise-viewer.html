@@ -351,15 +351,15 @@ mv.addEventListener('load', () => {
   if (!mv.model) return;
   const mats = mv.model.materials;
 
-  // Copy color from shell002
-  const mat002 = mats.find(m => m.name && m.name.toLowerCase().includes('shell002'));
+  // Copy color from solid shell half (material "None.015")
+  const mat002 = mats.find(m => m.name === 'None.015');
   if (mat002) {
     const f = mat002.pbrMetallicRoughness.baseColorFactor;
     shellBaseRGB = [f[0], f[1], f[2]];
   }
 
-  // Find shell001 material
-  shellMat = mats.find(m => m.name && m.name.toLowerCase().includes('shell001')) || null;
+  // Transparent shell half is material "shell right"
+  shellMat = mats.find(m => m.name === 'shell right') || null;
 
   if (shellMat) {
     shellMat.setAlphaMode('BLEND');
@@ -371,7 +371,7 @@ mv.addEventListener('load', () => {
 
 function applyShell(visible, opacity) {
   if (!shellMat && mv.model) {
-    shellMat = mv.model.materials.find(m => m.name && m.name.toLowerCase().includes('shell001')) || null;
+    shellMat = mv.model.materials.find(m => m.name === 'shell right') || null;
     if (shellMat) shellMat.setAlphaMode('BLEND');
   }
   if (!shellMat) return;
