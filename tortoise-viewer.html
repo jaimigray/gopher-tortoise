@@ -346,19 +346,39 @@ function nudgeRender() {
 
 let shellObj = null;
 
-mv.addEventListener('load', () => {
+function findShell() {
   const scene = getThreeScene();
-  if (!scene) return;
-  scene.traverse(obj => { if (obj.name === 'shell001') shellObj = obj; });
+  if (!scene) return null;
+  let found = null;
+  scene.traverse(obj => {
+    if (!found && obj.name && obj.name.toLowerCase() === 'shell001') found = obj;
+  });
+  return found;
+}
+
+function initShell(obj) {
+  // Pre-enable transparency so opacity slider works immediately
+  obj.traverse(child => {
+    if (!child.isMesh) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    mats.forEach(m => { m.transparent = true; m.needsUpdate = true; });
+  });
+  nudgeRender();
+}
+
+mv.addEventListener('load', () => {
+  shellObj = findShell();
+  if (shellObj) initShell(shellObj);
 });
 
 function applyShell(visible, opacity) {
+  if (!shellObj) shellObj = findShell();
   if (!shellObj) return;
   shellObj.visible = visible;
   shellObj.traverse(child => {
     if (!child.isMesh) return;
     const mats = Array.isArray(child.material) ? child.material : [child.material];
-    mats.forEach(m => { m.transparent = opacity < 1; m.opacity = opacity; m.needsUpdate = true; });
+    mats.forEach(m => { m.transparent = true; m.opacity = opacity; m.needsUpdate = true; });
   });
   nudgeRender();
 }
